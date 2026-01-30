@@ -1,7 +1,7 @@
 """Numeric controls for the EVSE EmProto integration"""
 from __future__ import annotations
 
-from homeassistant.components.number import NumberEntity
+from homeassistant.components.number import NumberEntity, RestoreNumber
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfElectricCurrent, UnitOfTime
 from homeassistant.core import HomeAssistant
@@ -31,7 +31,7 @@ async def async_setup_entry(
     
     async_add_entities(entities)
 
-class EVSECurrentControl(CoordinatorEntity, NumberEntity):
+class EVSECurrentControl(CoordinatorEntity, RestoreNumber):
     """Control for EVSE maximum current"""
     
     def __init__(self, coordinator, client, serial: str, base_name: str):
@@ -52,7 +52,15 @@ class EVSECurrentControl(CoordinatorEntity, NumberEntity):
             "manufacturer": "Oniric75",
             "model": "EVSE Master UDP",
         }
-    
+
+    async def async_added_to_hass(self) -> None:
+        """Restore last known value when entity is added."""
+        await super().async_added_to_hass()
+        if (last_number_data := await self.async_get_last_number_data()) is not None:
+            if last_number_data.native_value is not None:
+                self._restored_value = last_number_data.native_value
+                
+
     @property
     def evse_data(self):
         """Get EVSE data"""
@@ -62,8 +70,14 @@ class EVSECurrentControl(CoordinatorEntity, NumberEntity):
     def native_value(self) -> float | None:
         """Return the current configured maximum current value"""
         data = self.evse_data
-        return data.get("configured_max_electricity", 6)
-    
+        evse_value = data.get("configured_max_electricity")
+        restored_value = self._restored_value
+        if restored_value is not None:
+            return restored_value
+        if evse_value is not None:
+            return evse_value
+        return 6
+
     @property
     def available(self) -> bool:
         """Return whether the control is available"""
