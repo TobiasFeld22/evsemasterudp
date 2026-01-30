@@ -58,8 +58,8 @@ class EVSEDataUpdateCoordinator(DataUpdateCoordinator):
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the EVSE integration from a config entry"""
     
-    # Check if this is the first time setup
-    is_first_setup = entry.entry_id not in hass.data.get(DOMAIN, {})
+    # Check if this entry has been set up before using options
+    is_first_setup = not entry.options.get("setup_complete", False)
 
     # Retrieve configuration parameters
     serial = entry.data.get("serial")
@@ -119,6 +119,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Notification recommending a restart after installation/update
     if is_first_setup:
+        # Mark this entry as configured by updating options
+        hass.config_entries.async_update_entry(
+            entry,
+            options={**entry.options, "setup_complete": True}
+        )
+        
         create(
             hass,
             f"EVSE Master UDP successfully configured for EVSE {serial}.\n\n"
